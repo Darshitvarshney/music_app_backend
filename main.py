@@ -23,13 +23,52 @@ try:
                 print(f"Database table initialization warning: {e}")
         yield
 
+    from fastapi.responses import JSONResponse
+
     app = FastAPI(lifespan=lifespan)
+
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request, exc):
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": str(exc),
+                "type": type(exc).__name__,
+                "traceback": traceback.format_exc(),
+            },
+        )
 
     app.include_router(user_router)
 
     @app.get("/")
     async def root():
         return {"message": "Hello World"}
+
+    @app.get("/test-db")
+    async def test_db():
+        from database import DATABASE_URL, engine
+        if not DATABASE_URL:
+            return {"status": "error", "message": "DATABASE_URL is not set"}
+        sanitized_url = DATABASE_URL
+        if "@" in sanitized_url:
+            prefix, suffix = sanitized_url.split("@", 1)
+            sanitized_url = prefix.split(":")[0] + ":***@" + suffix
+        try:
+            from sqlalchemy import text
+            with engine.connect() as conn:
+                res = conn.execute(text("SELECT 1")).scalar()
+            # Also ensure tables are created
+            Base.metadata.create_all(bind=engine)
+            return {"status": "connected", "select_1": res, "db_url": sanitized_url}
+        except Exception as e:
+            return {
+                "status": "connection_failed",
+                "error": str(e),
+                "type": type(e).__name__,
+                "db_url": sanitized_url,
+                "traceback": traceback.format_exc(),
+            }
+
 
 except Exception:
     from fastapi import FastAPI
