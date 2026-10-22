@@ -28,3 +28,30 @@ class UserSignUp(BaseModel):
 class UserLogin(BaseModel):
     email: str = Field(..., pattern=EMAIL_REGEX, description="Valid email address")
     password: str
+
+
+class UserResponse(BaseModel):
+    id: str
+    name: str
+    email: str
+
+    class Config:
+        from_attributes = True
+
+
+class TokenResponse(BaseModel):
+    message: str
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
+class RefreshTokenInput(BaseModel):
+    refresh_token: str
+
+
+class RefreshTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
