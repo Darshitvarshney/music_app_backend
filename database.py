@@ -14,11 +14,17 @@ if DATABASE_URL:
     # Ensure postgresql:// schema is used (convert postgres:// if provided by cloud providers like Supabase/Neon/Heroku)
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    try:
+        engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    except Exception as e:
+        print(f"Engine creation failed: {e}")
+        engine = None
+        SessionLocal = None
 else:
     engine = None
     SessionLocal = None
+
 
 
 def get_db():
