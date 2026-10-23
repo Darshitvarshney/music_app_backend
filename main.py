@@ -11,7 +11,9 @@ try:
     from fastapi import FastAPI
     from database import engine, SessionLocal, Base
     from models.user import User  # Registers table schema with Base
+    from models.favorite import FavoriteSong  # Registers favorite_songs schema with Base
     from routes.user import router as user_router
+    from routes.favorite import router as favorite_router
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -39,6 +41,7 @@ try:
         )
 
     app.include_router(user_router)
+    app.include_router(favorite_router)
 
     @app.get("/")
     async def root():
