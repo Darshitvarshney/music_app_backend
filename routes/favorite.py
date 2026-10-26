@@ -24,10 +24,7 @@ def add_favorite(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Adds a song to the authenticated user's liked songs.
-    Stores the JioSaavn perma_url alongside basic metadata snapshot for fast client-side rendering.
-    """
+    """Adds a song to the user's liked songs (stores perma_url plus a metadata snapshot)."""
     # Check if song is already favorited by this user
     existing = (
         db.query(FavoriteSong)
@@ -75,9 +72,7 @@ def remove_favorite(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Removes a song from the authenticated user's favorites by song_id.
-    """
+    """Removes a song from the user's favorites."""
     favorite = (
         db.query(FavoriteSong)
         .filter(FavoriteSong.user_id == current_user.id, FavoriteSong.song_id == song_id)
@@ -108,9 +103,7 @@ def list_favorites(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Retrieves the authenticated user's liked songs list sorted by most recently liked.
-    """
+    """The user's liked songs, newest first."""
     base_query = db.query(FavoriteSong).filter(FavoriteSong.user_id == current_user.id)
     total = base_query.count()
 
@@ -135,9 +128,7 @@ def check_favorite_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Checks if a specific song is currently liked by the authenticated user.
-    """
+    """Whether the user has liked a song."""
     is_liked = (
         db.query(FavoriteSong.id)
         .filter(FavoriteSong.user_id == current_user.id, FavoriteSong.song_id == song_id)
@@ -157,10 +148,7 @@ def check_favorite_status_batch(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Batch-checks a list of song IDs to see which ones are liked by the current user.
-    Very efficient for search results or album tracklists.
-    """
+    """Which of the given song IDs the user has liked."""
     if not payload.song_ids:
         return BatchStatusResponse(liked_song_ids=[])
 

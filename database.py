@@ -1,4 +1,5 @@
 import os
+import threading
 from dotenv import load_dotenv
 from fastapi import HTTPException
 from sqlalchemy import create_engine
@@ -27,12 +28,34 @@ else:
 
 
 
+_tables_ready = False
+_tables_lock = threading.Lock()
+
+
+def ensure_tables():
+    """Creates missing tables once per process. Called from `get_db` because the lifespan
+    hook isn't guaranteed on Vercel; never alters existing tables."""
+    global _tables_ready
+    if _tables_ready or engine is None:
+        return
+    with _tables_lock:
+        if _tables_ready:
+            return
+        try:
+            Base.metadata.create_all(bind=engine)
+            _tables_ready = True
+        except Exception as e:
+            # Leave the flag unset so the next request retries
+            print(f"Database table initialization warning: {e}")
+
+
 def get_db():
     if SessionLocal is None:
         raise HTTPException(
             status_code=500,
             detail="DATABASE_URL environment variable is not configured.",
         )
+    ensure_tables()
     db = SessionLocal()
     try:
         yield db

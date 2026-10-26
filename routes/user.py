@@ -1,5 +1,5 @@
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -12,6 +12,7 @@ from models.user import (
     UserResponse,
     UserSignUp,
 )
+from utils.invite import verify_invite_code
 from utils.auth import (
     create_access_token,
     create_refresh_token,
@@ -23,7 +24,10 @@ router = APIRouter(prefix="/user", tags=["User"])
 
 
 @router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def signup(user_data: UserSignUp, db: Session = Depends(get_db)):
+def signup(user_data: UserSignUp, request: Request, db: Session = Depends(get_db)):
+    # The invite code is checked first so nothing else (e.g. whether an email is registered) leaks without it.
+    verify_invite_code(db, request, user_data.invite_code)
+
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
         raise HTTPException(

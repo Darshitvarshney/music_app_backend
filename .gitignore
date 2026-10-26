@@ -83,3 +83,7 @@ cover/
 Thumbs.db
 ehthumbs.db
 desktop.ini
+
+# Tests are kept local only (developer decision); do not commit them
+/tests/
+requirements-dev.txt

@@ -1,9 +1,4 @@
-"""
-JioSaavn catalog routes, merged from the former song_api Flask service.
-
-Paths, query parameters and response bodies are kept identical to the old
-service (song-api-nine.vercel.app) so clients only need to swap the base URL.
-"""
+"""JioSaavn catalog routes (merged from song_api; paths and bodies unchanged)."""
 import json
 from traceback import print_exc
 
@@ -16,11 +11,8 @@ router = APIRouter(tags=["Songs"])
 
 
 class FlaskStyleJSONResponse(JSONResponse):
-    """Serializes like Flask's jsonify: ASCII-escaped and key-sorted.
-
-    The Flutter client decodes `response.body`, which falls back to latin-1
-    when no charset is sent, so non-ASCII song titles must stay escaped.
-    """
+    """Flask-style JSON: ASCII-escaped, key-sorted. The Flutter client decodes as latin-1
+    without a charset, so non-ASCII titles must stay escaped."""
 
     def render(self, content) -> bytes:
         return json.dumps(content, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("ascii")

@@ -23,6 +23,7 @@ class UserSignUp(BaseModel):
     name: str
     email: str = Field(..., pattern=EMAIL_REGEX, description="Valid email address")
     password: str
+    invite_code: str = Field(..., max_length=64, description="Secret invite code required to create an account")
 
 
 class UserLogin(BaseModel):

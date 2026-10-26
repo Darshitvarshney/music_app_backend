@@ -12,8 +12,21 @@ try:
     from database import engine, SessionLocal, Base
     from models.user import User  # Registers table schema with Base
     from models.favorite import FavoriteSong  # Registers favorite_songs schema with Base
+    from models.recent_search import RecentSearch  # Registers recent_searches schema with Base
+    from models.room import Room, RoomMember  # Registers rooms + room_members schemas with Base
+    from models.playlist import Playlist, PlaylistSong  # Registers playlists + playlist_songs schemas with Base
+    from models.profile import UserProfile  # Registers user_profiles schema with Base
+    from models.signup_attempt import SignupAttempt  # Registers signup_attempts schema with Base
+    from models.friendship import Friendship  # Registers friendships schema with Base
+    from models.presence import NowPlaying, UserPresence  # Registers now_playing + user_presence schemas with Base
     from routes.user import router as user_router
     from routes.favorite import router as favorite_router
+    from routes.recent_search import router as recent_search_router
+    from routes.room import router as room_router
+    from routes.playlist import router as playlist_router
+    from routes.profile import router as profile_router
+    from routes.friend import router as friend_router
+    from routes.presence import router as presence_router
     from routes.song import router as song_router
 
     @asynccontextmanager
@@ -47,6 +60,12 @@ try:
 
     app.include_router(user_router)
     app.include_router(favorite_router)
+    app.include_router(recent_search_router)
+    app.include_router(room_router)
+    app.include_router(playlist_router)
+    app.include_router(profile_router)
+    app.include_router(friend_router)
+    app.include_router(presence_router)
     app.include_router(song_router)
 
     @app.get("/")
