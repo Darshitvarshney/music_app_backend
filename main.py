@@ -14,6 +14,7 @@ try:
     from models.favorite import FavoriteSong  # Registers favorite_songs schema with Base
     from routes.user import router as user_router
     from routes.favorite import router as favorite_router
+    from routes.song import router as song_router
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -25,9 +26,13 @@ try:
                 print(f"Database table initialization warning: {e}")
         yield
 
+    from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import JSONResponse
 
     app = FastAPI(lifespan=lifespan)
+
+    # Open CORS, matching the former song_api service (Flask-CORS defaults)
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
     @app.exception_handler(Exception)
     async def global_exception_handler(request, exc):
@@ -42,6 +47,7 @@ try:
 
     app.include_router(user_router)
     app.include_router(favorite_router)
+    app.include_router(song_router)
 
     @app.get("/")
     async def root():
