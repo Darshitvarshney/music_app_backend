@@ -79,6 +79,10 @@ class PlaylistSongCreate(BaseModel):
     year: Optional[str] = None
 
 
+class PlaylistSongsBulkCreate(BaseModel):
+    songs: List[PlaylistSongCreate] = Field(..., min_length=1, max_length=100)
+
+
 class PlaylistSongResponse(BaseModel):
     id: str
     song_id: str
@@ -130,3 +134,9 @@ class PlaylistSongActionResponse(BaseModel):
 class PlaylistMembershipResponse(BaseModel):
     song_id: str
     playlist_ids: List[str]
+
+
+class PlaylistBulkAddResponse(BaseModel):
+    added: int
+    skipped: int
+    playlist: Optional[PlaylistSummary] = None

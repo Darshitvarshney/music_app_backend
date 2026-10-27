@@ -10,6 +10,7 @@ from database import get_db
 from models.playlist import (
     Playlist,
     PlaylistActionResponse,
+    PlaylistBulkAddResponse,
     PlaylistCreate,
     PlaylistDetail,
     PlaylistListResponse,
@@ -18,6 +19,7 @@ from models.playlist import (
     PlaylistSongActionResponse,
     PlaylistSongCreate,
     PlaylistSongResponse,
+    PlaylistSongsBulkCreate,
     PlaylistSummary,
     PlaylistUpdate,
 )
@@ -311,6 +313,63 @@ def add_song(
         )
     db.refresh(playlist)
     return PlaylistSongActionResponse(message="Song added", added=True, playlist=_summary(db, playlist))
+
+
+@router.post("/{playlist_id}/songs/bulk", response_model=PlaylistBulkAddResponse)
+def add_songs_bulk(
+    playlist_id: str,
+    payload: PlaylistSongsBulkCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Appends up to 100 songs in order; duplicates and anything past the playlist cap are skipped."""
+    playlist = _owned_playlist(db, current_user, playlist_id)
+
+    have = {
+        row[0]
+        for row in db.query(PlaylistSong.song_id).filter(PlaylistSong.playlist_id == playlist.id).all()
+    }
+    last_position = (
+        db.query(func.max(PlaylistSong.position)).filter(PlaylistSong.playlist_id == playlist.id).scalar() or 0
+    )
+    room = MAX_SONGS_PER_PLAYLIST - len(have)
+
+    added = 0
+    now = _now()
+    for song in payload.songs:
+        if added >= room:
+            break
+        if song.song_id in have:
+            continue
+        have.add(song.song_id)
+        added += 1
+        db.add(
+            PlaylistSong(
+                playlist_id=playlist.id,
+                song_id=song.song_id,
+                perma_url=song.perma_url,
+                title=song.title,
+                artist=song.artist,
+                album=song.album,
+                image_url=song.image_url,
+                duration=str(song.duration) if song.duration is not None else None,
+                language=song.language,
+                year=song.year,
+                position=last_position + added,
+                added_at=now,
+            )
+        )
+    if added:
+        playlist.updated_at = now
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Playlist changed while adding songs, please retry")
+    db.refresh(playlist)
+    return PlaylistBulkAddResponse(
+        added=added, skipped=len(payload.songs) - added, playlist=_summary(db, playlist)
+    )
 
 
 @router.delete("/{playlist_id}/songs/{song_id}", response_model=PlaylistSongActionResponse)

@@ -6,6 +6,8 @@ import requests
 
 from . import endpoints, helper
 
+SEARCH_TIMEOUT = 6
+
 
 def search_for_song(query, lyrics, songdata, page=1, count=20):
     if query.startswith('http') and 'saavn.com' in query:
@@ -14,11 +16,11 @@ def search_for_song(query, lyrics, songdata, page=1, count=20):
 
     search_url = f"{endpoints.search_base_url}&p={page}&n={count}&q={query}"
     try:
-        response = requests.get(search_url).json()
+        response = requests.get(search_url, timeout=SEARCH_TIMEOUT).json()
         song_response = response.get('results', [])
     except Exception:
-        raw = requests.get(search_url).text
         try:
+            raw = requests.get(search_url, timeout=SEARCH_TIMEOUT).text
             pattern = r'\(From "([^"]+)"\)'
             raw = re.sub(pattern, r"(From '\1')", raw)
             response = json.loads(raw)

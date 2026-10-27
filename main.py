@@ -19,6 +19,7 @@ try:
     from models.signup_attempt import SignupAttempt  # Registers signup_attempts schema with Base
     from models.friendship import Friendship  # Registers friendships schema with Base
     from models.presence import NowPlaying, UserPresence  # Registers now_playing + user_presence schemas with Base
+    from models.device_sync import DeviceSync  # Registers device_sync schema with Base
     from routes.user import router as user_router
     from routes.favorite import router as favorite_router
     from routes.recent_search import router as recent_search_router
@@ -27,7 +28,9 @@ try:
     from routes.profile import router as profile_router
     from routes.friend import router as friend_router
     from routes.presence import router as presence_router
+    from routes.device_sync import router as device_sync_router
     from routes.song import router as song_router
+    from routes.importer import router as import_router
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -66,7 +69,9 @@ try:
     app.include_router(profile_router)
     app.include_router(friend_router)
     app.include_router(presence_router)
+    app.include_router(device_sync_router)
     app.include_router(song_router)
+    app.include_router(import_router)
 
     @app.get("/")
     async def root():
