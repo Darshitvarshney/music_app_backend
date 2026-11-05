@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional, Union
 from pydantic import BaseModel, Field
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, TEXT, UniqueConstraint, func
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, TEXT, UniqueConstraint, func
 from database import Base
 
 MAX_ROOM_MEMBERS = 3  # joined members + pending invites together
@@ -31,6 +31,14 @@ class Room(Base):
     year = Column(TEXT, nullable=True)
     song_changed_by = Column(TEXT, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     song_changed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Synchronized Playback State (pause, seek, volume)
+    is_playing = Column(Boolean, nullable=False, default=True)
+    playback_position_ms = Column(Integer, nullable=False, default=0)
+    playback_updated_at = Column(DateTime(timezone=True), nullable=True)
+    playback_seq = Column(Integer, nullable=False, default=0)
+    volume = Column(Float, nullable=False, default=1.0)  # 0.0 to 1.0 software volume
+    playback_changed_by = Column(TEXT, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -101,6 +109,13 @@ class RoomMemberInfo(BaseModel):
     is_me: bool = False
 
 
+class RoomPlaybackInput(BaseModel):
+    is_playing: Optional[bool] = None
+    position_ms: Optional[int] = None
+    volume: Optional[float] = None
+    expected_playback_seq: Optional[int] = None
+
+
 class RoomState(BaseModel):
     id: str
     capacity: int = MAX_ROOM_MEMBERS
@@ -108,6 +123,12 @@ class RoomState(BaseModel):
     song: Optional[RoomSong] = None
     song_changed_by: Optional[str] = None  # username
     song_changed_at: Optional[datetime] = None
+    is_playing: bool = True
+    position_ms: int = 0
+    playback_updated_at: Optional[datetime] = None
+    playback_seq: int = 0
+    volume: float = 1.0
+    playback_changed_by: Optional[str] = None  # username
     members: List[RoomMemberInfo] = []
 
 

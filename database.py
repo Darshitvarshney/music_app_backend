@@ -32,9 +32,36 @@ _tables_ready = False
 _tables_lock = threading.Lock()
 
 
+def _migrate_room_columns():
+    """Adds playback sync columns to rooms table if they do not exist."""
+    if engine is None:
+        return
+    try:
+        with engine.begin() as conn:
+            dialect_name = engine.dialect.name
+            columns = [
+                ("is_playing", "BOOLEAN NOT NULL DEFAULT TRUE" if dialect_name == "postgresql" else "INTEGER NOT NULL DEFAULT 1"),
+                ("playback_position_ms", "INTEGER NOT NULL DEFAULT 0"),
+                ("playback_updated_at", "TIMESTAMPTZ" if dialect_name == "postgresql" else "DATETIME"),
+                ("playback_seq", "INTEGER NOT NULL DEFAULT 0"),
+                ("volume", "DOUBLE PRECISION NOT NULL DEFAULT 1.0" if dialect_name == "postgresql" else "FLOAT NOT NULL DEFAULT 1.0"),
+                ("playback_changed_by", "TEXT REFERENCES users(id) ON DELETE SET NULL" if dialect_name == "postgresql" else "TEXT"),
+            ]
+            for col_name, col_def in columns:
+                try:
+                    if dialect_name == "postgresql":
+                        conn.exec_driver_sql(f"ALTER TABLE rooms ADD COLUMN IF NOT EXISTS {col_name} {col_def};")
+                    else:
+                        conn.exec_driver_sql(f"ALTER TABLE rooms ADD COLUMN {col_name} {col_def};")
+                except Exception:
+                    pass
+    except Exception as e:
+        print(f"Room table column migration notice: {e}")
+
+
 def ensure_tables():
     """Creates missing tables once per process. Called from `get_db` because the lifespan
-    hook isn't guaranteed on Vercel; never alters existing tables."""
+    hook isn't guaranteed on Vercel; adds missing columns to existing tables."""
     global _tables_ready
     if _tables_ready or engine is None:
         return
@@ -43,6 +70,7 @@ def ensure_tables():
             return
         try:
             Base.metadata.create_all(bind=engine)
+            _migrate_room_columns()
             _tables_ready = True
         except Exception as e:
             # Leave the flag unset so the next request retries

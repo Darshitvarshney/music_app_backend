@@ -20,6 +20,7 @@ from models.room import (
     RoomInviteItem,
     RoomMember,
     RoomMemberInfo,
+    RoomPlaybackInput,
     RoomSong,
     RoomSongInput,
     RoomSongResponse,
@@ -131,7 +132,11 @@ def _state(db: Session, room: Room, me: User) -> RoomState:
         .order_by(RoomMember.created_at, RoomMember.id)
         .all()
     )
-    ids = [m.user_id for m in members] + ([room.song_changed_by] if room.song_changed_by else [])
+    ids = (
+        [m.user_id for m in members]
+        + ([room.song_changed_by] if room.song_changed_by else [])
+        + ([room.playback_changed_by] if room.playback_changed_by else [])
+    )
     people = _people(db, ids)
     now = now_utc()
 
@@ -167,6 +172,7 @@ def _state(db: Session, room: Room, me: User) -> RoomState:
             year=room.year,
         )
     changer = people.get(room.song_changed_by) if room.song_changed_by else None
+    playback_changer = people.get(room.playback_changed_by) if room.playback_changed_by else None
     return RoomState(
         id=room.id,
         capacity=MAX_ROOM_MEMBERS,
@@ -174,6 +180,12 @@ def _state(db: Session, room: Room, me: User) -> RoomState:
         song=song,
         song_changed_by=changer["username"] if changer else None,
         song_changed_at=room.song_changed_at,
+        is_playing=room.is_playing if room.is_playing is not None else True,
+        position_ms=room.playback_position_ms or 0,
+        playback_updated_at=room.playback_updated_at,
+        playback_seq=room.playback_seq or 0,
+        volume=room.volume if room.volume is not None else 1.0,
+        playback_changed_by=playback_changer["username"] if playback_changer else None,
         members=infos,
     )
 
@@ -234,7 +246,16 @@ def create_room(
         raise api_error(400, "too_many_invites", f"A room can have at most {MAX_ROOM_MEMBERS} people")
 
     now = now_utc()
-    room = Room(created_by=current_user.id, created_at=now)
+    room = Room(
+        created_by=current_user.id,
+        created_at=now,
+        is_playing=True,
+        playback_position_ms=0,
+        playback_updated_at=now,
+        playback_seq=0,
+        volume=1.0,
+        playback_changed_by=current_user.id,
+    )
     db.add(room)
     db.flush()
     db.add(RoomMember(room_id=room.id, user_id=current_user.id, status=MEMBER_JOINED,
@@ -397,7 +418,56 @@ def set_room_song(
     room.year = payload.year
     room.song_changed_by = current_user.id
     room.song_changed_at = now_utc()
+
+    # Reset playback state for new track
+    room.is_playing = True
+    room.playback_position_ms = 0
+    room.playback_updated_at = now_utc()
+    room.playback_seq = (room.playback_seq or 0) + 1
+    room.playback_changed_by = current_user.id
+
     db.commit()
     db.refresh(room)
     return RoomSongResponse(applied=True, message="Song shared with the room",
                             room=_state(db, room, current_user))
+
+
+@router.put("/{room_id}/playback", response_model=RoomActionResponse)
+def set_room_playback(
+    room_id: str,
+    payload: RoomPlaybackInput,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Updates play/pause state, seek position, and volume across all room members."""
+    room, member = _joined_room(db, current_user, room_id)
+    _touch(member)
+
+    # Concurrency check: drop stale actions if client's seen seq is behind
+    if (
+        payload.expected_playback_seq is not None
+        and payload.expected_playback_seq < (room.playback_seq or 0)
+    ):
+        db.commit()
+        return RoomActionResponse(
+            message="Playback already updated by another member",
+            room=_state(db, room, current_user),
+        )
+
+    if payload.is_playing is not None:
+        room.is_playing = payload.is_playing
+    if payload.position_ms is not None:
+        room.playback_position_ms = max(0, payload.position_ms)
+    if payload.volume is not None:
+        room.volume = max(0.0, min(1.0, payload.volume))
+
+    room.playback_updated_at = now_utc()
+    room.playback_seq = (room.playback_seq or 0) + 1
+    room.playback_changed_by = current_user.id
+
+    db.commit()
+    db.refresh(room)
+    return RoomActionResponse(
+        message="Playback state updated",
+        room=_state(db, room, current_user),
+    )
